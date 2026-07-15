@@ -1,0 +1,17 @@
+{
+  "name": "paperkraken",
+  "owner": {
+    "name": "devwoo41",
+    "email": "devwooju@gmail.com"
+  },
+  "description": "PaperKraken — tutorial-grade critical-reading reports for research papers",
+  "plugins": [
+    {
+      "name": "paperkraken",
+      "source": "./",
+      "description": "Turn any research-paper PDF into a tutorial-grade critical-reading report (typeset PDF, Korean or English) using Nature's 7-step methodology.",
+      "category": "research",
+      "tags": ["research", "papers", "arxiv", "pdf", "critical-reading"]
+    }
+  ]
+}

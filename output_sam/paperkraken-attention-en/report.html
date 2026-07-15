@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PaperKraken — Attention Is All You Need</title>
+<script>
+window.PagedConfig = { auto: false };
+MathJax = {
+  tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']], tags: 'none' },
+  svg: { fontCache: 'none' },
+  startup: {
+    pageReady: () => MathJax.startup.defaultPageReady()
+      .then(() => window.PagedPolyfill.preview())
+      .then(() => { window.__PK_DONE = true; })
+  }
+};
+</script>
+<script src="assets/mathjax/tex-svg.js"></script>
+<script src="assets/pagedjs/paged.polyfill.js"></script>
+<style>
+@font-face { font-family:'Pretendard'; src:url('assets/fonts/PretendardVariable.woff2') format('woff2-variations'); font-weight:100 900; }
+@font-face { font-family:'Satoshi'; src:url('assets/fonts/satoshi/Satoshi-400.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Satoshi'; src:url('assets/fonts/satoshi/Satoshi-500.woff2') format('woff2'); font-weight:500; }
+@font-face { font-family:'Satoshi'; src:url('assets/fonts/satoshi/Satoshi-700.woff2') format('woff2'); font-weight:700; }
+
+:root {
+  --ink:#1a1c20; --sub:#5a6070; --line:#e3e6ec; --accent:#0f4c81; --accent-soft:#eef4fa;
+  --warn:#9a6700; --warn-soft:#fff8e6; --ok:#1a7f37;
+}
+* { box-sizing:border-box; }
+html { font-size:10.5pt; }
+body {
+  font-family:'Satoshi','Pretendard',sans-serif; color:var(--ink);
+  margin:0; line-height:1.75; overflow-wrap:break-word;
+}
+@page {
+  size:A4; margin:16mm 16mm 18mm 16mm;
+  @bottom-center { content: counter(page); font-family:'Satoshi',sans-serif; font-size:8.5pt; color:#5a6070; }
+  @top-right { content: string(runhead); font-family:'Satoshi','Pretendard',sans-serif; font-size:8pt; color:#5a6070; letter-spacing:.06em; }
+}
+@page cover { @bottom-center { content: none; } @top-right { content: none; } }
+.cover { page: cover; }
+h2 { string-set: runhead content(text); }
+.phase h2 { string-set: runhead content(text); }
+
+h1,h2,h3,h4 { line-height:1.35; }
+h1 { font-size:1.9rem; margin:0 0 .3rem; }
+h2 { font-size:1.35rem; margin:2.2rem 0 .8rem; padding-bottom:.35rem; border-bottom:2px solid var(--ink); break-after:avoid; }
+h3 { font-size:1.12rem; margin:1.6rem 0 .6rem; color:var(--accent); break-after:avoid; }
+h4 { font-size:1rem; margin:1.2rem 0 .4rem; break-after:avoid; }
+p { margin:.55rem 0; }
+code { font-family:'NanumGothicCoding','D2Coding',monospace; font-size:.92em; background:#f4f5f7; padding:.08em .35em; border-radius:4px; }
+
+.cover { display:flex; flex-direction:column; justify-content:center; }
+.cover .kicker { color:var(--accent); font-weight:700; letter-spacing:.12em; text-transform:uppercase; font-size:.85rem; }
+.cover .meta { color:var(--sub); margin-top:1.2rem; font-size:.95rem; }
+.cover .meta div { margin:.2rem 0; }
+.cover .toc-box { margin-top:2.2rem; border-top:1px solid var(--line); padding-top:1rem; }
+
+ul.toc { list-style:none; padding:0; font-size:.95rem; margin:.3rem 0; }
+ul.toc li { margin:.28rem 0; }
+ul.toc li.toc-sub { padding-left:1.2rem; font-size:.9rem; color:var(--sub); }
+ul.toc a { color:inherit; text-decoration:none; }
+ul.toc a::after { content: target-counter(attr(href), page); float:right; color:var(--sub); }
+
+.phase { break-before:page; background:var(--ink); color:#fff; padding:.9rem 1.2rem; border-radius:10px; margin:0 0 1.4rem; }
+.phase .ph-num { font-size:.8rem; letter-spacing:.15em; text-transform:uppercase; opacity:.75; }
+.phase h2 { border:none; color:#fff; margin:0; padding:0; }
+.step-tag { display:inline-block; background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:.8rem; padding:.15rem .6rem; border-radius:999px; margin-bottom:.2rem; }
+.howto { background:var(--accent-soft); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 8px 8px 0; margin:.8rem 0; font-size:.95rem; break-inside:avoid; }
+.howto .howto-label { font-weight:700; color:var(--accent); font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; }
+
+.eq-card { border:1px solid var(--line); border-radius:12px; padding:1rem 1.2rem; margin:1.1rem 0; }
+.eq-card .eq-head { break-inside:avoid; break-after:avoid; }
+.eq-card .eq-title { font-weight:700; font-size:1.02rem; margin-bottom:.4rem; }
+.eq-card .eq-display { background:#fafbfc; border-radius:8px; padding:.6rem .8rem; margin:.5rem 0; overflow-x:auto; break-inside:avoid; }
+.eq-card .eq-sec { font-weight:700; font-size:.82rem; color:var(--sub); letter-spacing:.06em; text-transform:uppercase; margin:.8rem 0 .25rem; break-after:avoid; }
+.eq-card table { width:100%; border-collapse:collapse; font-size:.92rem; }
+.eq-card td, .eq-card th { border-top:1px solid var(--line); padding:.35rem .5rem; vertical-align:top; text-align:left; }
+.eq-card tr { break-inside:avoid; }
+.eq-dep { font-size:.9rem; color:var(--sub); background:#f7f8fa; border-radius:8px; padding:.45rem .7rem; break-inside:avoid; }
+
+figure { margin:1.2rem 0; break-inside:avoid; }
+figure img { max-width:100%; border:1px solid var(--line); border-radius:8px; display:block; margin:0 auto; }
+figcaption { font-size:.88rem; color:var(--sub); margin-top:.45rem; text-align:center; }
+.fig-read { border:1px solid var(--line); border-top:none; border-radius:0 0 10px 10px; padding:.7rem 1rem; margin-top:-.4rem; font-size:.94rem; }
+.fig-read dt { font-weight:700; color:var(--accent); margin-top:.5rem; font-size:.86rem; break-after:avoid; }
+.fig-read dd { margin:0.1rem 0 0 0; }
+
+.badge-v { color:var(--ok); font-weight:700; font-size:.82rem; }
+.badge-u { display:inline-block; background:var(--warn-soft); color:var(--warn); font-weight:700; font-size:.78rem; padding:.05rem .5rem; border-radius:999px; }
+sup.kref a { color:var(--accent); text-decoration:none; font-weight:700; }
+
+table.plain { width:100%; border-collapse:collapse; font-size:.93rem; margin:.8rem 0; }
+table.plain th { background:#f4f5f7; }
+table.plain th, table.plain td { border:1px solid var(--line); padding:.4rem .6rem; text-align:left; vertical-align:top; }
+table.plain tr { break-inside:avoid; }
+table.plain td.num, table.plain th.num { text-align:right; font-variant-numeric:tabular-nums; }
+.table-note { font-size:.85rem; color:var(--sub); margin-top:.2rem; }
+
+.rung { border-left:3px solid var(--accent); padding:.1rem 0 .6rem 1rem; margin:0 0 .6rem .4rem; break-inside:avoid; }
+.rung .rung-title { font-weight:700; }
+.rung .rung-title .no { color:var(--accent); }
+.rung .unlocks { font-size:.88rem; color:var(--sub); }
+
+ul.check { list-style:none; padding-left:.2rem; }
+ul.check li::before { content:"☐ "; color:var(--accent); font-weight:700; }
+blockquote { border-left:3px solid var(--line); margin:.8rem 0; padding:.2rem 0 .2rem 1rem; color:var(--sub); }
+
+/* Common sticking points (FAQ) */
+.stick { border:1px solid var(--line); border-left:4px solid var(--warn); border-radius:0 10px 10px 0; padding:.7rem 1rem; margin:.9rem 0; }
+.stick .q { font-weight:700; }
+.stick .lbl { font-weight:700; font-size:.78rem; color:var(--warn); text-transform:uppercase; letter-spacing:.06em; margin-top:.5rem; break-after:avoid; }
+
+.pbreak { break-before:page; }
+
+/* Run-it-yourself appendix */
+.run-card { border:1px solid var(--line); border-radius:12px; padding:.6rem 1rem; margin:.8rem 0; }
+.run-card .run-title { font-weight:700; margin-bottom:.3rem; break-after:avoid; }
+pre.runnable, pre.run-output { font-family:'NanumGothicCoding','D2Coding',monospace; font-size:.84rem; line-height:1.45; border-radius:8px; padding:.45rem .7rem; overflow-x:auto; margin:.3rem 0; break-inside:avoid; }
+pre.runnable { background:#f4f5f7; }
+pre.run-output { background:var(--accent-soft); border-left:3px solid var(--accent); }
+.run-verified { font-size:.8rem; color:var(--ok); font-weight:700; }
+
+mjx-container { break-inside:avoid; }
+mjx-container[display="true"] { overflow-x:auto; overflow-y:hidden; max-width:100%; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ Cover ═══════════════ -->
+<section class="cover">
+  <div class="kicker">Paperkraken Reading Report</div>
+  <h1>Attention Is All You Need</h1>
+  <p style="color:var(--sub); font-size:1.05rem;">The Transformer — sequence transduction from attention alone, with recurrence and convolution stripped out</p>
+  <div class="meta">
+    <div><b>Authors</b> · Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, Illia Polosukhin (Google Brain / Google Research / Univ. of Toronto)</div>
+    <div><b>Venue</b> · 31st Conference on Neural Information Processing Systems (NIPS 2017), Long Beach, CA · arXiv:1706.03762</div>
+    <div><b>Report language</b> · English</div>
+    <div><b>Contents</b> · 5 equations analyzed · 3 original figure crops · 3 re-typeset tables · 11 web-verified background items · 4 machine-verified code snippets</div>
+  </div>
+  <p style="margin-top:1.4rem;"><b>One-line summary.</b> The paper removes recurrence (RNNs) and convolution (CNNs) entirely and builds an encoder–decoder from <b>self-attention alone</b> — the <b>Transformer</b>. Because every pair of positions is connected by a constant number of operations, training parallelizes massively, and the model set a new state of the art on WMT 2014 English–German and English–French translation at a fraction of the training cost.</p>
+  <div class="toc-box">
+    <ul class="toc">
+      <li><a href="#howto">How to read this report — Cornwell's 7 steps</a></li>
+      <li><a href="#phase0">Phase 0 — Background (ladder · related-work map)</a></li>
+      <li><a href="#phase1">Phase 1 — The Aerial View (Steps 1 · 2 · 3)</a></li>
+      <li><a href="#phase2">Phase 2 — The Interrogation (Steps 4 · 5)</a></li>
+      <li class="toc-sub"><a href="#eqs">Equation-by-equation analysis (5 cards)</a></li>
+      <li class="toc-sub"><a href="#step5">Independent conclusions (Tables 2 · 3)</a></li>
+      <li class="toc-sub"><a href="#stick">Common sticking points, Top 4</a></li>
+      <li><a href="#phase3">Phase 3 — The Verdict (Steps 6 · 7)</a></li>
+      <li><a href="#insight">Final insight &amp; 7-question self-check</a></li>
+      <li><a href="#runbox">Appendix — Run it yourself (4 verified snippets)</a></li>
+      <li><a href="#glossary">Glossary</a></li>
+      <li><a href="#refs">References (with verification status)</a></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════ How to read ═══════════════ -->
+<h2 id="howto">How to read this report — Cornwell's 7-step method</h2>
+<p>Reading a paper well does not start with the equations on page one. The method Jacques Cornwell laid out in a <i>Nature</i> career column (2026) proceeds in three phases — <b>context → interrogation → verdict</b> — across seven steps. First grasp the big picture (Steps 1–3), then take the methodology and the math apart (Steps 4–5), and only at the end weigh the authors' claims against your own independent reading (Steps 6–7). Each section of this report follows one of those steps, and every step does two things: <b>(a)</b> it first explains what a reader is supposed to do at that step, and <b>(b)</b> it then shows the result of actually doing it for this paper. An experienced researcher spends one to two hours on a paper this way; this document performs those hours for you and shows the work.</p>
+<table class="plain">
+  <tr><th style="width:22%">Phase</th><th style="width:34%">Step</th><th>Guiding question</th></tr>
+  <tr><td rowspan="3"><b>Phase 1</b><br>The Aerial View</td><td>Step 1. Gain a broad overview</td><td>Can the abstract and the key figure alone tell you the design, tools, and scope?</td></tr>
+  <tr><td>Step 2. Find the core research question</td><td>What specific hypothesis is this paper testing?</td></tr>
+  <tr><td>Step 3. Map the knowledge gap</td><td>What limits prior approaches, and where does this paper slot in?</td></tr>
+  <tr><td rowspan="2"><b>Phase 2</b><br>The Interrogation</td><td>Step 4. Assess the methodology</td><td>Does the experimental design actually answer the question? (math · structure · controls)</td></tr>
+  <tr><td>Step 5. Reach independent conclusions</td><td>Cover up the authors' interpretation — what do the results alone say?</td></tr>
+  <tr><td rowspan="2"><b>Phase 3</b><br>The Verdict</td><td>Step 6. Reconcile conclusions</td><td>Do the authors' claims outrun their data?</td></tr>
+  <tr><td>Step 7. Consider alternatives</td><td>Could confounders, other factors, or conflicts of interest explain the results?</td></tr>
+</table>
+
+<!-- ═══════════════ Phase 0 ═══════════════ -->
+<div class="phase" id="phase0"><div class="ph-num">Phase 0 · Preliminaries</div><h2>Background — groundwork before the 7 steps</h2></div>
+<p>This section is not one of Cornwell's steps, but it is the foundation you need before you can judge the paper's math yourself. The <b>prerequisite ladder</b> below starts from the most primitive concept (the dot product) and stacks upward, in dependency order, all the way to the paper's own notation (e.g. \( \mathrm{softmax}(QK^{\top}/\sqrt{d_k})V \)). Each rung gives <b>the concept → a short explanation → a worked example with real numbers → which symbol, equation, or claim of the paper it unlocks</b>. External knowledge appears only if it passed the verification protocol in the <a href="#refs">references</a>.</p>
+
+<h3>Prerequisite ladder</h3>
+<div>
+  <div class="rung"><span class="rung-title"><span class="no">1.</span> Dot product as similarity</span><br>
+    The dot product \(a\cdot b=\sum_i a_i b_i\) of two vectors grows when they point the same way — a <b>similarity score</b>.<br>
+    <i>Numbers:</i> \([1,2]\cdot[3,4]=1\cdot3+2\cdot4=11\), while \([1,2]\cdot[-2,1]=0\) (orthogonal).<br>
+    <span class="unlocks">→ \(QK^{\top}\) in Eq. (1): the query–key dot product measures "how much should this position look at that one".</span></div>
+  <div class="rung"><span class="rung-title"><span class="no">2.</span> Matrix multiplication and shape bookkeeping</span><br>
+    An \((m\times k)\) matrix times a \((k\times n)\) matrix gives \((m\times n)\). Stacking queries into a matrix processes them all at once.<br>
+    <i>Numbers:</i> 3 queries and 4 keys packed as \(Q\in\mathbb{R}^{3\times64}\), \(K\in\mathbb{R}^{4\times64}\) give \(QK^{\top}\in\mathbb{R}^{3\times4}\) — all 3×4 scores in one product.<br>
+    <span class="unlocks">→ why Eq. (1) uses packed matrices \(Q,K,V\) instead of single vectors (the heart of parallelization).</span></div>
+  <div class="rung"><span class="rung-title"><span class="no">3.</span> Softmax — scores to probabilities</span><br>
+    Mapping a real vector \(z\) through \(\mathrm{softmax}(z)_i=e^{z_i}/\sum_j e^{z_j}\) yields positive <b>weights that sum to 1</b>.<br>
+    <i>Numbers:</i> \(z=[2,1,0]\to e^{z}\approx[7.39,2.72,1]\), total 11.11 → \([0.665,0.245,0.090]\) (sums to 1.000; machine-checked in the appendix).<br>
+    <span class="unlocks">→ \(\mathrm{softmax}(\cdot)\) in Eq. (1): normalizes dot-product scores into "how much of each value to take".</span></div>
+  <div class="rung"><span class="rung-title"><span class="no">4.</span> Weighted average (convex combination)</span><br>
+    With weights \(w_i\ge0,\ \sum w_i=1\), the sum \(\sum_i w_i v_i\) is a <b>blend</b> of the values.<br>
+    <i>Numbers:</i> with the weights above, \(0.665\,v_1+0.245\,v_2+0.090\,v_3\) — a blend dominated by \(v_1\).<br>
+    <span class="unlocks">→ "the output is a weighted sum of values" — the definition of attention (the trailing \(\cdots V\) in Eq. (1)).</span></div>
+  <div class="rung"><span class="rung-title"><span class="no">5.</span> Word embeddings</span><br>
+    A learned look-up table maps each token to a \(d_{\text{model}}\)-dimensional real vector; similar words get nearby vectors.<br>
+    <i>Numbers:</i> this paper uses \(d_{\text{model}}=512\), so each token is a 512-dim vector; a 37k vocabulary makes the table \(37000\times512\).<br>
+    <span class="unlocks">→ the Input/Output Embedding boxes in Figure 1, and §3.4's multiplication of embeddings by \(\sqrt{d_{\text{model}}}\).</span></div>
+  <div class="rung"><span class="rung-title"><span class="no">6.</span> Encoder–decoder and autoregressive generation</span><br>
+    The encoder maps the input \((x_1,\dots,x_n)\) to a continuous representation \(z\); the decoder emits the next token while looking at \(z\) and <b>only the tokens generated so far</b>.<br>
+    <i>Numbers:</i> having generated "I am", the next step's input is "I am" and the target is "fine" — future tokens are invisible.<br>
+    <span class="unlocks">→ why the decoder has masked self-attention and why Figure 1 says "outputs (shifted right)".</span></div>
+  <div class="rung"><span class="rung-title"><span class="no">7.</span> Where attention came from (Bahdanau attention)</span><br>
+    In RNN translation, instead of squeezing the whole input into one vector, attention let each output word <b>softly select</b> the relevant input positions.<sup class="kref"><a href="#refs">[K1]</a></sup><br>
+    <i>The key difference:</i> this paper pulls that idea out of the RNN — representations are built from attention alone, no recurrence.<br>
+    <span class="unlocks">→ the conceptual root of self-attention; the comparison target in §2 Background.</span></div>
+  <div class="rung"><span class="rung-title"><span class="no">8.</span> Residual connections and LayerNorm</span><br>
+    Adding the input back to the output, \(x+\mathrm{Sublayer}(x)\) (residual<sup class="kref"><a href="#refs">[K11]</a></sup>), makes deep networks trainable; LayerNorm<sup class="kref"><a href="#refs">[K5]</a></sup> normalizes each sample's features to stabilize training.<br>
+    <i>Numbers:</i> features \([2,4,6]\) → mean 4, std \(\approx1.63\) → normalized \([-1.22,0,1.22]\).<br>
+    <span class="unlocks">→ every "Add &amp; Norm" box in Figure 1, i.e. \(\mathrm{LayerNorm}(x+\mathrm{Sublayer}(x))\).</span></div>
+  <div class="rung"><span class="rung-title"><span class="no">9.</span> Sine/cosine frequencies</span><br>
+    \(\sin(pos/T)\) oscillates with period \(2\pi T\). Stacking sinusoids of different wavelengths gives every position a unique pattern.<br>
+    <i>Numbers:</i> wavelengths grow geometrically from \(2\pi\) to \(10000\cdot2\pi\), building a 512-dim "positional fingerprint".<br>
+    <span class="unlocks">→ the positional-encoding formula \(PE_{(pos,2i)}=\sin(pos/10000^{2i/d_{\text{model}}})\).</span></div>
+  <div class="rung"><span class="rung-title"><span class="no">10.</span> Variance and scaling — why divide by \(\sqrt{d_k}\)</span><br>
+    The dot product of two independent \(d_k\)-dim vectors with zero-mean, unit-variance entries has mean 0 and variance \(d_k\). Large variance saturates the softmax and kills gradients.<br>
+    <i>Numbers:</i> with \(d_k=64\) the dot product's std is \(\approx8\); dividing by \(\sqrt{64}=8\) restores variance to 1.<br>
+    <span class="unlocks">→ the scale factor \(1/\sqrt{d_k}\) in Eq. (1) and the footnote that justifies it.</span></div>
+</div>
+
+<h3 class="pbreak">Related-work map — where this paper sits</h3>
+<p>Section §2 (Background) organizes the drive to "reduce sequential computation" into three lineages. Each lineage's <b>limitation</b> is precisely a design motivation for the Transformer.</p>
+<table class="plain">
+  <tr><th style="width:22%">Lineage</th><th style="width:36%">Representative work</th><th>Remaining limitation</th></tr>
+  <tr><td>① RNN seq2seq + attention</td><td>Sutskever et al. 2014 (seq2seq)<sup class="kref"><a href="#refs">[K2]</a></sup>, Bahdanau et al. 2014 (additive attention)<sup class="kref"><a href="#refs">[K1]</a></sup>, built on LSTMs<sup class="kref"><a href="#refs">[K3]</a></sup></td><td>The hidden state \(h_t\) depends on \(h_{t-1}\) → <b>\(O(n)\) sequential operations</b> along the sequence; training cannot parallelize within an example.</td></tr>
+  <tr><td>② CNN seq2seq</td><td>ByteNet<sup class="kref"><a href="#refs">[K6]</a></sup>, ConvS2S<sup class="kref"><a href="#refs">[K4]</a></sup>, Extended Neural GPU</td><td>Parallel across positions, but the path connecting two positions grows with their distance (linearly for ConvS2S, logarithmically for ByteNet) → long-range dependencies are hard to learn.</td></tr>
+  <tr><td>③ Self-attention inside RNNs / memory networks</td><td>structured attention, end-to-end memory networks</td><td>Uses self-attention but still coupled to recurrence → sequentiality remains.</td></tr>
+  <tr><td><b>→ This paper (Transformer)</b></td><td>A pure self-attention encoder–decoder</td><td>Any two positions connected in a <b>constant number of operations (\(O(1)\))</b>. Fully parallel, no recurrence or convolution. Simplifies the architecture itself, unlike large-scale conditional computation (MoE<sup class="kref"><a href="#refs">[K7]</a></sup>).</td></tr>
+</table>
+
+<!-- ═══════════════ Phase 1 ═══════════════ -->
+<div class="phase" id="phase1"><div class="ph-num">Phase 1 · The Aerial View</div><h2>Context — Steps 1 · 2 · 3</h2></div>
+
+<div class="step-tag">STEP 1</div>
+<h3>Gain a broad overview</h3>
+<div class="howto"><span class="howto-label">What to do at this step</span><br>
+Cornwell: "Resist the urge to dive straight into dense methodology. Instead, scan the abstract and review the figures." Dissect the abstract sentence by sentence into <b>background / method / result / significance</b>, and read the key figure (the architecture) element by element to fix the design, tools, and scope first.</div>
+
+<h4>The abstract, sentence by sentence</h4>
+<table class="plain">
+  <tr><th style="width:16%">Role</th><th>What the abstract asserts (gist)</th></tr>
+  <tr><td><b>Background</b></td><td>Dominant sequence-transduction models are complex RNNs or CNNs with an encoder and decoder; the best also connect the two through attention.</td></tr>
+  <tr><td><b>Method</b></td><td>Propose the <b>Transformer</b> — a simple architecture based on <b>attention only</b>, dispensing with recurrence and convolution entirely.</td></tr>
+  <tr><td><b>Result</b></td><td>WMT 2014 EN–DE <b>28.4 BLEU</b> (over 2 BLEU above the previous best incl. ensembles); single-model EN–FR <b>41.8 BLEU</b> after 3.5 days on 8 GPUs — a fraction of the prior training cost.</td></tr>
+  <tr><td><b>Significance</b></td><td>More parallelizable, faster to train, and generalizes well to English constituency parsing.</td></tr>
+</table>
+
+<figure>
+  <img src="figures/figure1.png" alt="Transformer architecture" style="max-width:72%">
+  <figcaption>Figure 1 — The full Transformer. Encoder stack on the left, decoder stack on the right; both repeat \(N=6\) times.</figcaption>
+</figure>
+<dl class="fig-read">
+  <dt>What this figure draws</dt><dd>The complete data flow: an encoder (left) turning the input sentence into representations, and a decoder (right) producing next-token probabilities from those representations plus its own output so far.</dd>
+  <dt>Reading order</dt><dd>① Bottom left: <b>Inputs</b> → Input Embedding maps tokens to 512-dim vectors. ② <b>Positional Encoding</b> is added (⊕) to inject order. ③ <b>Multi-Head Attention</b> (encoder self-attention) → <b>Add &amp; Norm</b> → <b>Feed Forward</b> → Add &amp; Norm; this layer repeats \(N\times\). ④ The decoder starts from <b>Masked</b> Multi-Head Attention (future blocked), then <b>encoder–decoder attention</b> taking the encoder output as keys/values, then Feed Forward. ⑤ At the top, <b>Linear + Softmax</b> gives next-word probabilities (Output Probabilities).</dd>
+  <dt>In-figure symbols</dt><dd>\(N\times\): the same layer stacked \(N=6\) times. ⊕: element-wise addition of embedding and positional encoding. "Outputs (shifted right)": the target sequence fed in shifted one step for autoregressive training. The arrows that split and rejoin at Add &amp; Norm are the residual connections.</dd>
+  <dt>What to observe</dt><dd>Nowhere in the encoder or decoder is there a recurrent arrow (a loop back through time) or a convolution — only stacked attention + FFN blocks. That is "attention is all you need", in picture form.</dd>
+  <dt>Connections</dt><dd>Multi-Head Attention blocks = Eq. (1) + the MultiHead formula; Feed Forward = Eq. (2); the ⊕ at the bottom = the positional-encoding formulas; Add &amp; Norm = \(\mathrm{LayerNorm}(x+\mathrm{Sublayer}(x))\).</dd>
+</dl>
+
+<div class="step-tag">STEP 2</div>
+<h3>Find the core research question</h3>
+<div class="howto"><span class="howto-label">What to do at this step</span><br>
+Locate the specific hypothesis — usually at the end of the introduction — and present it as <b>original quote + plain-language unpacking</b>; keep returning to it throughout. If it is never stated, reconstruct it and say so.</div>
+<p>The final paragraph of the introduction (§1) effectively declares the paper's thesis:</p>
+<blockquote>"In this work we propose the Transformer, a model architecture eschewing recurrence and instead relying entirely on an attention mechanism to draw global dependencies between input and output. The Transformer allows for significantly more parallelization and can reach a new state of the art in translation quality ..."</blockquote>
+<p><b>Unpacked — the hypothesis under test.</b> <i>Strip out recurrence and convolution entirely and build a sequence-transduction model from self-attention alone; then <b>(a)</b> translation quality does not degrade — it surpasses the state of the art — and <b>(b)</b> with sequential dependencies gone, training is much faster.</i> The rest of this report tracks whether claims (a) and (b) are actually supported by the math, the architecture, and the experiments.</p>
+
+<div class="step-tag">STEP 3</div>
+<h3 class="pbreak">Map the knowledge gap</h3>
+<div class="howto"><span class="howto-label">What to do at this step</span><br>
+From the introduction and related work, summarize the state of the field, the lineages of prior approaches and their limits, and the puzzle piece this paper adds. (The detailed lineage table is in <a href="#phase0">Phase 0's related-work map</a>.)</div>
+<p>The gap is crisp. RNNs cannot parallelize within an example because of their <b>sequentiality</b> — factorizing along positions means \(h_t\) waits for \(h_{t-1}\) — and memory constraints limit batching across long sequences. CNNs parallelize, but their <b>path length grows with distance</b> (linearly for ConvS2S, logarithmically for ByteNet), making long-range dependencies harder to learn. Attention had already proven itself for modeling dependencies regardless of distance, yet — as the paper itself notes, "in all but a few cases" — it was always used <i>together with</i> a recurrent network, so the sequential bottleneck remained.</p>
+<p>The open slot is therefore precise: <b>"can attention alone, with no recurrence, build the representations?"</b> The Transformer is that piece — any two positions linked in \(O(1)\) operations, fully parallel, with §4's complexity analysis (Table 1 below) quantifying the advantage. The paper also probes how far the piece generalizes beyond translation, testing the same architecture on English constituency parsing (§6.3) with competitive results — a first hint that the design is not translation-specific.</p>
+
+<!-- ═══════════════ Phase 2 ═══════════════ -->
+<div class="phase" id="phase2"><div class="ph-num">Phase 2 · The Interrogation</div><h2>Detailed evaluation — Steps 4 · 5</h2></div>
+
+<div class="step-tag">STEP 4</div>
+<h3>Methodology assessment (1) — method dissection</h3>
+<div class="howto"><span class="howto-label">What to do at this step</span><br>
+Check that the experimental design answers the research question: appropriateness of tools, models, and data; sample size and repeats (for ML: seeds and repeat runs); positive/negative controls (for ML: baselines and ablations); data and code availability. This step has two large parts: <b>method dissection</b> and <b>equation-by-equation analysis</b>.</div>
+
+<h4>The Transformer in pipeline order</h4>
+<p><b>(1) Embedding + positional encoding.</b> Tokens are embedded into \(d_{\text{model}}=512\) vectors (multiplied by \(\sqrt{d_{\text{model}}}\)) and a positional encoding is added — without recurrence, this is the only way the model knows word order. <b>(2) Encoder layers ×6.</b> Each layer = [multi-head self-attention] + [position-wise FFN], each sublayer wrapped in residual + LayerNorm (Add &amp; Norm). <b>(3) Decoder layers ×6.</b> Each layer = [masked self-attention (future positions set to \(-\infty\) to preserve autoregression)] + [encoder–decoder attention (queries from the decoder, keys/values from the encoder output)] + [FFN]. <b>(4) Output.</b> A final Linear produces vocabulary logits, softmax turns them into probabilities (weights shared with the embedding matrix).</p>
+
+<figure>
+  <img src="figures/figure2.png" alt="Scaled dot-product and multi-head attention">
+  <figcaption>Figure 2 — (left) The operations inside Scaled Dot-Product Attention; (right) Multi-Head Attention running \(h\) of them in parallel.</figcaption>
+</figure>
+<dl class="fig-read">
+  <dt>What this figure draws</dt><dd>Left: the five-operation stack by which one attention unit maps \(Q,K,V\) to an output. Right: the same unit run \(h\) times in parallel through different learned projections, then merged.</dd>
+  <dt>Reading order</dt><dd><b>Left, bottom → top:</b> ① MatMul (\(QK^{\top}\), similarity scores) → ② Scale (÷\(\sqrt{d_k}\)) → ③ Mask (opt.) (only in the decoder: future positions to \(-\infty\)) → ④ SoftMax (weights) → ⑤ MatMul (weights × \(V\), the weighted sum). <b>Right, bottom → top:</b> \(V,K,Q\) each pass through Linear layers \(h\) times → \(h\) Scaled Dot-Product Attentions run in parallel → Concat → a final Linear (\(W^O\)) back to \(d_{\text{model}}\).</dd>
+  <dt>In-figure symbols</dt><dd>\(Q\) (queries), \(K\) (keys), \(V\) (values): matrices obtained by projecting the input. \(h\): the number of parallel heads (8 in this paper). "Mask (opt.)": optional masking, switched on only in decoder self-attention.</dd>
+  <dt>What to observe</dt><dd>Why split into \(h\) small heads instead of one big one? A single attention averages and smears information. Shrinking to \(d_k=d_v=d_{\text{model}}/h=64\) and running \(h\) of them keeps total compute near single-head cost while attending to several <b>representation subspaces</b> at once.</dd>
+  <dt>Connections</dt><dd>The whole left panel = Eq. (1). The whole right panel = the MultiHead formula (card below). The Mask block = §3.2.3's preservation of decoder autoregression.</dd>
+</dl>
+
+<h3 id="eqs">Methodology assessment (2) — equation-by-equation analysis</h3>
+<p>The paper has three numbered equations; two unnumbered ones (MultiHead and the positional encoding) are decisive for understanding, so all five get a card.</p>
+
+<div class="eq-card">
+  <div class="eq-head">
+    <div class="eq-title">Scaled Dot-Product Attention — Eq. (1)</div>
+    <div class="eq-display">\[ \mathrm{Attention}(Q,K,V)=\mathrm{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V \]</div>
+  </div>
+  <div class="eq-sec">Symbols</div>
+  <table>
+    <tr><th style="width:18%">Symbol</th><th style="width:26%">Type / shape</th><th>Meaning</th></tr>
+    <tr><td>\(Q\)</td><td>matrix \(\mathbb{R}^{n\times d_k}\)</td><td>packed queries — "what each position is looking for"</td></tr>
+    <tr><td>\(K\)</td><td>matrix \(\mathbb{R}^{m\times d_k}\)</td><td>packed keys — "the label each position advertises"</td></tr>
+    <tr><td>\(V\)</td><td>matrix \(\mathbb{R}^{m\times d_v}\)</td><td>packed values — "the content actually retrieved"</td></tr>
+    <tr><td>\(QK^{\top}\)</td><td>matrix \(\mathbb{R}^{n\times m}\)</td><td>dot-product (similarity) scores for every query–key pair</td></tr>
+    <tr><td>\(d_k\)</td><td>scalar</td><td>key/query dimension (64 in this paper)</td></tr>
+    <tr><td>\(\sqrt{d_k}\)</td><td>scalar</td><td>variance-normalizing scale factor</td></tr>
+  </table>
+  <div class="eq-sec">Term-by-term roles</div>
+  <table>
+    <tr><td style="width:18%">\(QK^{\top}\)</td><td>Measures how aligned each query is with each key; a large value says "look there". Remove it and the model has no basis for deciding where to attend.</td></tr>
+    <tr><td>\(/\sqrt{d_k}\)</td><td>As \(d_k\) grows, dot-product variance inflates like \(d_k\), saturating the softmax (vanishing gradients). Dividing by \(\sqrt{d_k}\) restores variance to \(\approx1\); without it, training stalls at large \(d_k\).</td></tr>
+    <tr><td>\(\mathrm{softmax}(\cdot)\)</td><td>Turns scores into weights summing to 1 — per row, "how much of each value to take".</td></tr>
+    <tr><td>\(\cdots V\)</td><td>Blends the values with those weights. The output is a mixture of the content at relevant positions.</td></tr>
+  </table>
+  <div class="eq-sec">Intuition</div>
+  <p>"Hold your question (\(Q\)) against the labels (\(K\)) on a row of drawers, then pull out each drawer's contents (\(V\)) in proportion to the match." With numbers: if a query scores \([8,0]\) against two keys (scaled: \([1,0]\)), softmax gives \([0.73,0.27]\) and the output is \(0.73\,v_1+0.27\,v_2\).</p>
+  <div class="eq-sec">Dependencies</div>
+  <div class="eq-dep">Prerequisite ladder (dot product · softmax · weighted average) → <b>this equation</b> → substituted per-head into the MultiHead formula; in the decoder, the Mask slips in before the softmax.</div>
+</div>
+
+<div class="eq-card">
+  <div class="eq-head">
+    <div class="eq-title">Multi-Head Attention — (unnumbered, §3.2.2)</div>
+    <div class="eq-display">\[ \mathrm{MultiHead}(Q,K,V)=\mathrm{Concat}(\mathrm{head}_1,\dots,\mathrm{head}_h)\,W^O \]</div>
+    <div class="eq-display">\[ \text{where}\quad \mathrm{head}_i=\mathrm{Attention}(QW_i^Q,\ KW_i^K,\ VW_i^V) \]</div>
+  </div>
+  <div class="eq-sec">Symbols</div>
+  <table>
+    <tr><th style="width:18%">Symbol</th><th style="width:30%">Type / shape</th><th>Meaning</th></tr>
+    <tr><td>\(h\)</td><td>scalar</td><td>number of heads (8 in this paper)</td></tr>
+    <tr><td>\(W_i^Q\)</td><td>matrix \(\mathbb{R}^{d_{\text{model}}\times d_k}\)</td><td>query projection of head \(i\)</td></tr>
+    <tr><td>\(W_i^K\)</td><td>matrix \(\mathbb{R}^{d_{\text{model}}\times d_k}\)</td><td>key projection of head \(i\)</td></tr>
+    <tr><td>\(W_i^V\)</td><td>matrix \(\mathbb{R}^{d_{\text{model}}\times d_v}\)</td><td>value projection of head \(i\)</td></tr>
+    <tr><td>\(W^O\)</td><td>matrix \(\mathbb{R}^{hd_v\times d_{\text{model}}}\)</td><td>output projection returning the concat to \(d_{\text{model}}\)</td></tr>
+    <tr><td>\(\mathrm{head}_i\)</td><td>matrix \(\mathbb{R}^{n\times d_v}\)</td><td>attention output in the \(i\)-th subspace</td></tr>
+  </table>
+  <div class="eq-sec">Term-by-term roles</div>
+  <table>
+    <tr><td style="width:26%">\(QW_i^Q,\ KW_i^K,\ VW_i^V\)</td><td>Project the same input from a different learned angle per head, so different heads can watch different relations (syntax, coreference, ...). Without the projections, all heads would see the same thing.</td></tr>
+    <tr><td>\(\mathrm{Concat}(\cdots)\)</td><td>Joins the \(h\) head outputs (\(d_v=64\) each) into one \(hd_v=512\) vector, pooling the subspace views.</td></tr>
+    <tr><td>\(W^O\)</td><td>Mixes the pooled information back to \(d_{\text{model}}\), matching shapes for the residual addition.</td></tr>
+  </table>
+  <div class="eq-sec">Intuition</div>
+  <p>Instead of one reader reading a sentence from a single perspective, eight readers read it simultaneously from different perspectives (subject–verb agreement, pronoun reference, adjacency, ...) and pool their summaries. Because \(d_k=d_v=512/8=64\), all eight together cost about as much as one full-width attention.</p>
+  <div class="eq-sec">Dependencies</div>
+  <div class="eq-dep">Eq. (1) is the inside of every \(\mathrm{head}_i\) → <b>this formula</b> → used by all three attentions in Figure 1 (encoder self / decoder masked self / encoder–decoder).</div>
+</div>
+
+<div class="eq-card">
+  <div class="eq-head">
+    <div class="eq-title">Position-wise Feed-Forward Network — Eq. (2)</div>
+    <div class="eq-display">\[ \mathrm{FFN}(x)=\max(0,\ xW_1+b_1)\,W_2+b_2 \]</div>
+  </div>
+  <div class="eq-sec">Symbols</div>
+  <table>
+    <tr><th style="width:20%">Symbol</th><th style="width:32%">Type / shape</th><th>Meaning</th></tr>
+    <tr><td>\(x\)</td><td>vector \(\mathbb{R}^{d_{\text{model}}}\)</td><td>one position's representation (512-dim)</td></tr>
+    <tr><td>\(W_1,b_1\)</td><td>\(\mathbb{R}^{512\times2048},\ \mathbb{R}^{2048}\)</td><td>expansion layer (inner dimension \(d_{ff}=2048\))</td></tr>
+    <tr><td>\(W_2,b_2\)</td><td>\(\mathbb{R}^{2048\times512},\ \mathbb{R}^{512}\)</td><td>contraction layer (back to 512)</td></tr>
+    <tr><td>\(\max(0,\cdot)\)</td><td>function (ReLU)</td><td>nonlinearity clipping negatives to zero</td></tr>
+  </table>
+  <div class="eq-sec">Term-by-term roles</div>
+  <table>
+    <tr><td style="width:22%">\(xW_1+b_1\)</td><td>Widens 512 → 2048, lifting each position into a richer feature space.</td></tr>
+    <tr><td>\(\max(0,\cdot)\)</td><td>Injects nonlinearity — without it the two linear layers collapse into one and the expressive power vanishes.</td></tr>
+    <tr><td>\(\cdots W_2+b_2\)</td><td>Contracts 2048 → 512 to match shapes for the residual addition and the next layer.</td></tr>
+  </table>
+  <div class="eq-sec">Intuition</div>
+  <p>If attention mixes information <i>between</i> positions, the FFN reprocesses each position <b>independently and identically</b> (the same \(W_1,W_2\) at every position — two convolutions with kernel size 1). Zero cross-position interaction is exactly its division of labor with attention.</p>
+  <div class="eq-sec">Dependencies</div>
+  <div class="eq-dep">MultiHead output (after Add &amp; Norm) → <b>this equation</b> → another Add &amp; Norm → next layer. One per layer in both encoder and decoder.</div>
+</div>
+
+<div class="eq-card">
+  <div class="eq-head">
+    <div class="eq-title">Positional Encoding — (unnumbered, §3.5)</div>
+    <div class="eq-display">\[ PE_{(pos,2i)}=\sin\!\left(pos/10000^{\,2i/d_{\text{model}}}\right) \]</div>
+    <div class="eq-display">\[ PE_{(pos,2i+1)}=\cos\!\left(pos/10000^{\,2i/d_{\text{model}}}\right) \]</div>
+  </div>
+  <div class="eq-sec">Symbols</div>
+  <table>
+    <tr><th style="width:24%">Symbol</th><th style="width:22%">Type</th><th>Meaning</th></tr>
+    <tr><td>\(pos\)</td><td>integer scalar</td><td>position in the sequence (0, 1, 2, ...)</td></tr>
+    <tr><td>\(i\)</td><td>integer scalar</td><td>dimension index (even → sin, odd → cos)</td></tr>
+    <tr><td>\(d_{\text{model}}\)</td><td>scalar</td><td>embedding width (512) — PE shares it so the two can be added</td></tr>
+    <tr><td>\(10000^{2i/d_{\text{model}}}\)</td><td>scalar</td><td>per-dimension wavelength (period) control</td></tr>
+  </table>
+  <div class="eq-sec">Term-by-term roles</div>
+  <table>
+    <tr><td style="width:30%">\(pos/10000^{2i/d_{\text{model}}}\)</td><td>Low \(i\) → short wavelength (fast oscillation), high \(i\) → long wavelength. Wavelengths spread geometrically from \(2\pi\) to \(10000\cdot2\pi\), giving each position a unique pattern.</td></tr>
+    <tr><td>sin / cos pairs</td><td>With each frequency present as a sin–cos pair, \(PE_{pos+k}\) is a linear transform of \(PE_{pos}\) for any fixed offset \(k\) — making <b>relative positions</b> easy to learn.</td></tr>
+  </table>
+  <div class="eq-sec">Intuition</div>
+  <p>Encode "which position am I" as the combined angles of clock hands spinning at many speeds. Learned positional embeddings performed nearly identically (Table 3 (E)); the sinusoids were chosen hoping they extrapolate to sequences <b>longer than those seen in training</b>.</p>
+  <div class="eq-sec">Dependencies</div>
+  <div class="eq-dep">Input embedding (×\(\sqrt{d_{\text{model}}}\)) → <b>element-wise addition with this</b> → the first layer of both stacks. The only channel for order information in a recurrence-free model.</div>
+</div>
+
+<div class="eq-card">
+  <div class="eq-head">
+    <div class="eq-title">Learning-rate schedule — Eq. (3)</div>
+    <div class="eq-display">\[ lrate=d_{\text{model}}^{-0.5}\cdot\min\!\left(step\_num^{-0.5},\ step\_num\cdot warmup\_steps^{-1.5}\right) \]</div>
+  </div>
+  <div class="eq-sec">Symbols</div>
+  <table>
+    <tr><th style="width:26%">Symbol</th><th style="width:20%">Type</th><th>Meaning</th></tr>
+    <tr><td>\(step\_num\)</td><td>integer</td><td>training steps so far</td></tr>
+    <tr><td>\(warmup\_steps\)</td><td>integer (=4000)</td><td>length of the linear warm-up window</td></tr>
+    <tr><td>\(d_{\text{model}}\)</td><td>scalar (=512)</td><td>model width — sets the overall learning-rate scale</td></tr>
+  </table>
+  <div class="eq-sec">Term-by-term roles</div>
+  <table>
+    <tr><td style="width:34%">\(step\_num\cdot warmup\_steps^{-1.5}\)</td><td>Dominates during warm-up (\(step \lt warmup\)) → learning rate grows <b>linearly</b>, avoiding early instability from large steps.</td></tr>
+    <tr><td>\(step\_num^{-0.5}\)</td><td>Dominates afterwards → learning rate decays as the <b>inverse square root</b>, fine-tuning late in training.</td></tr>
+    <tr><td>\(\min(\cdot,\cdot)\)</td><td>Switches between the two regimes automatically; they cross exactly at \(step=warmup\_steps\).</td></tr>
+    <tr><td>\(d_{\text{model}}^{-0.5}\)</td><td>Larger models get smaller learning rates, matching the overall scale.</td></tr>
+  </table>
+  <div class="eq-sec">Intuition</div>
+  <p>"Warm slowly, then cool gently." The rate peaks at \(warmup=4000\) and decays smoothly after; used with Adam<sup class="kref"><a href="#refs">[K8]</a></sup> (\(\beta_1{=}0.9,\beta_2{=}0.98,\epsilon{=}10^{-9}\)).</p>
+  <div class="eq-sec">Dependencies</div>
+  <div class="eq-dep">An <b>optimization recipe</b> independent of the architecture. Defined in §5.3; every training result in Tables 2–3 depends on it.</div>
+</div>
+
+<h3>Complexity evidence — what Table 1 says</h3>
+<p>Section §4 quantifies the case for self-attention along three axes. Notation: \(n\) = sequence length, \(d\) = representation width, \(k\) = convolution kernel, \(r\) = restricted-attention neighborhood.</p>
+<table class="plain">
+  <tr><th>Layer type</th><th class="num">Complexity per layer</th><th class="num">Sequential ops</th><th class="num">Max path length</th></tr>
+  <tr><td><b>Self-Attention</b></td><td class="num">\(O(n^2\cdot d)\)</td><td class="num">\(O(1)\)</td><td class="num">\(O(1)\)</td></tr>
+  <tr><td>Recurrent</td><td class="num">\(O(n\cdot d^2)\)</td><td class="num">\(O(n)\)</td><td class="num">\(O(n)\)</td></tr>
+  <tr><td>Convolutional</td><td class="num">\(O(k\cdot n\cdot d^2)\)</td><td class="num">\(O(1)\)</td><td class="num">\(O(\log_k n)\)</td></tr>
+  <tr><td>Self-Attention (restricted)</td><td class="num">\(O(r\cdot n\cdot d)\)</td><td class="num">\(O(1)\)</td><td class="num">\(O(n/r)\)</td></tr>
+</table>
+<p class="table-note">Re-typeset from the paper's Table 1; values verified cell by cell against the original.</p>
+<p>The point: self-attention needs \(O(1)\) sequential operations and has \(O(1)\) path length — any two positions connect in one hop (RNNs are \(O(n)\) on both). Per-layer cost is even cheaper than an RNN whenever \(n \lt d\), the common case in sentence-level translation. This is the theoretical backing for claim (b), "training gets faster".</p>
+
+<h3>Methodology audit checklist</h3>
+<table class="plain">
+  <tr><th style="width:22%">Audit item</th><th>State in this paper</th><th style="width:12%">Verdict</th></tr>
+  <tr><td>Tools/data appropriateness</td><td>WMT 2014 EN–DE (~4.5M sentence pairs) and EN–FR (36M); byte-pair / word-piece encodings — the field's standard benchmark.</td><td><span class="badge-v">solid ✓</span></td></tr>
+  <tr><td>Samples / repeats (seeds)</td><td>Final translation numbers largely from a <b>single training run</b> + checkpoint averaging. No seed variance or confidence intervals reported.</td><td><span class="badge-u">weak</span></td></tr>
+  <tr><td>Negative control = baselines</td><td>Table 2 compares many of the era's strongest models: ByteNet, ConvS2S, GNMT, MoE.</td><td><span class="badge-v">solid ✓</span></td></tr>
+  <tr><td>Positive control = ablations</td><td>Table 3 systematically varies heads, \(d_k\), model size, dropout, positional encoding.</td><td><span class="badge-v">solid ✓</span></td></tr>
+  <tr><td>Data availability</td><td>WMT 2014 is a public, standard dataset.</td><td><span class="badge-v">public ✓</span></td></tr>
+  <tr><td>Code availability</td><td>Training/evaluation code released as <code>tensorflow/tensor2tensor</code>.</td><td><span class="badge-v">public ✓</span></td></tr>
+</table>
+
+<div class="step-tag" id="step5">STEP 5</div>
+<h3>Reach independent conclusions</h3>
+<div class="howto"><span class="howto-label">What to do at this step</span><br>
+Cornwell: "Skip the discussion section; examine results and figures directly to form your own interpretation before reading the author interpretations." Below, the authors' narrative is <b>deliberately covered up</b>: we separate what the table's numbers support by themselves from what this data cannot tell us.</div>
+
+<h4>Main result — translation quality and training cost</h4>
+<table class="plain">
+  <tr><th>Model</th><th class="num">BLEU EN-DE</th><th class="num">BLEU EN-FR</th><th class="num">Training cost (FLOPs) EN-DE</th><th class="num">EN-FR</th></tr>
+  <tr><td>ByteNet</td><td class="num">23.75</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+  <tr><td>GNMT + RL</td><td class="num">24.6</td><td class="num">39.92</td><td class="num">\(2.3\cdot10^{19}\)</td><td class="num">\(1.4\cdot10^{20}\)</td></tr>
+  <tr><td>ConvS2S</td><td class="num">25.16</td><td class="num">40.46</td><td class="num">\(9.6\cdot10^{18}\)</td><td class="num">\(1.5\cdot10^{20}\)</td></tr>
+  <tr><td>MoE</td><td class="num">26.03</td><td class="num">40.56</td><td class="num">\(2.0\cdot10^{19}\)</td><td class="num">\(1.2\cdot10^{20}\)</td></tr>
+  <tr><td>GNMT + RL <i>Ensemble</i></td><td class="num">26.30</td><td class="num">41.16</td><td class="num">\(1.8\cdot10^{20}\)</td><td class="num">\(1.1\cdot10^{21}\)</td></tr>
+  <tr><td>ConvS2S <i>Ensemble</i></td><td class="num">26.36</td><td class="num">41.29</td><td class="num">\(7.7\cdot10^{19}\)</td><td class="num">\(1.2\cdot10^{21}\)</td></tr>
+  <tr><td><b>Transformer (base)</b></td><td class="num"><b>27.3</b></td><td class="num">38.1</td><td class="num"><b>\(3.3\cdot10^{18}\)</b></td><td class="num"><b>\(3.3\cdot10^{18}\)</b></td></tr>
+  <tr><td><b>Transformer (big)</b></td><td class="num"><b>28.4</b></td><td class="num"><b>41.8</b></td><td class="num">\(2.3\cdot10^{19}\)</td><td class="num">\(2.3\cdot10^{19}\)</td></tr>
+</table>
+<p class="table-note">Re-typeset from the paper's Table 2 (WMT 2014 newstest2014); values verified cell by cell. The EN-FR-only Deep-Att+PosUnk rows are omitted for space — single 39.2 / ensemble 40.4.</p>
+<p><b>What the numbers themselves say.</b> Transformer (big)'s EN-DE <b>28.4</b> beats every single and ensemble model in the table. Its EN-FR <b>41.8</b> is the best single model. Transformer (base) trains for \(3.3\times10^{18}\) FLOPs — one to three orders of magnitude below ConvS2S and GNMT (\(10^{19}\)–\(10^{21}\)). "Higher BLEU at lower cost" holds from this one table.</p>
+<p><b>What this data alone cannot say.</b> The table says nothing about how well BLEU tracks real translation quality (fluency, meaning preservation). FLOPs are estimates (peak GPU throughput × time) and can differ from wall-clock. Both language pairs are high-resource, so generalization to low-resource languages is unknown.</p>
+<p><b>Questions to ask yourself.</b> ① Is the gain from the architecture, or from the training recipe — bigger batches, label smoothing, checkpoint averaging? ② EN-FR base (38.1) trails some ensembles; in which setting exactly does "SOTA" hold? ③ Is the cost comparison apples-to-apples (hardware and precision assumptions)?</p>
+
+<h4>Ablations — what actually moves the needle</h4>
+<table class="plain">
+  <tr><th style="width:10%">Variant</th><th>Change (base: \(N{=}6\), \(d_{\text{model}}{=}512\), \(h{=}8\), \(P_{drop}{=}0.1\))</th><th class="num">PPL (dev)</th><th class="num">BLEU (dev)</th></tr>
+  <tr><td>base</td><td>—</td><td class="num">4.92</td><td class="num">25.8</td></tr>
+  <tr><td rowspan="2">(A)</td><td>1 head (\(d_k{=}512\))</td><td class="num">5.29</td><td class="num">24.9</td></tr>
+  <tr><td>32 heads (\(d_k{=}16\))</td><td class="num">5.01</td><td class="num">25.4</td></tr>
+  <tr><td>(B)</td><td>\(d_k\) reduced to 16</td><td class="num">5.16</td><td class="num">25.1</td></tr>
+  <tr><td>(C)</td><td>bigger model (\(d_{\text{model}}{=}1024\), \(d_{ff}{=}4096\))</td><td class="num">4.66–5.12</td><td class="num">25.4–26.2</td></tr>
+  <tr><td rowspan="2">(D)</td><td>dropout 0.0</td><td class="num">5.77</td><td class="num">24.6</td></tr>
+  <tr><td>dropout 0.2</td><td class="num">4.95</td><td class="num">25.5</td></tr>
+  <tr><td>(E)</td><td>learned positional embedding instead of sinusoids</td><td class="num">4.92</td><td class="num">25.7</td></tr>
+  <tr><td><b>big</b></td><td>\(N{=}6\), \(d_{\text{model}}{=}1024\), \(h{=}16\), \(P_{drop}{=}0.3\), 300K steps</td><td class="num"><b>4.33</b></td><td class="num"><b>26.4</b></td></tr>
+</table>
+<p class="table-note">Condensed re-typeset of the paper's Table 3 (EN-DE newstest2013 dev) — representative rows only, values verified cell by cell. See the paper for the full grid.</p>
+<p><b>What the numbers themselves say.</b> (A) One head (24.9) is worse than eight (25.8), and too many (32 → 25.4) also hurts — the middle wins. (B) Cutting \(d_k\) to 16 drops quality to 25.1 → key width matters. (C) Bigger models generally improve. (D) No dropout overfits (24.6); 0.2 is better. (E) Learned positional embeddings (25.7) are effectively tied with sinusoids (25.8).</p>
+<p><b>What this data alone cannot say.</b> These are single runs on a dev set (newstest2013); whether 0.1–0.4 BLEU gaps are statistically meaningful is unknown, as is whether the trends transfer beyond one language pair.</p>
+<p><b>Questions to ask yourself.</b> ① How many repeats would you need before calling a 0.9 BLEU gap "important"? ② If (E) is a tie, the case for sinusoids rests on what, exactly (extrapolation hopes)? ③ Which lever is largest — heads, size, or dropout?</p>
+
+<figure>
+  <img src="figures/figure3.png" alt="Attention visualization">
+  <figcaption>Figure 3 — Encoder self-attention (layer 5 of 6) tracking the long-distance dependency from the verb 'making' to the distant 'more difficult' (colors distinguish heads).</figcaption>
+</figure>
+<dl class="fig-read">
+  <dt>What this figure draws</dt><dd>The attention weights that the word 'making' assigns to other positions in one sentence, drawn as lines between two parallel copies of the sentence, with line darkness showing weight.</dd>
+  <dt>Reading order</dt><dd>Follow the lines leaving 'making' in the top row. The dark lines run to the distant words completing the phrase 'making ... more difficult' — a <b>long-range</b>, non-adjacent link. Differently colored lines are different heads watching different targets.</dd>
+  <dt>In-figure symbols</dt><dd>&lt;EOS&gt; (end of sentence), &lt;pad&gt; (length padding). No mathematical symbols; line opacity = attention weight.</dd>
+  <dt>What to observe</dt><dd>Qualitative evidence that a single layer captures a distant grammatical dependency directly, with no recurrence or convolution — Table 1's "path length \(O(1)\)" showing up as actual learned long-range structure.</dd>
+  <dt>Connections</dt><dd>These are literally the softmax weights of Eq. (1), and they support §4's suggestion that self-attention may yield more interpretable models.</dd>
+</dl>
+
+<h3 id="stick">Common sticking points, Top 4</h3>
+<p>These are the places where first-time readers actually stall. Each is resolved as <b>the misreading → why the paper invites it → the resolution</b>.</p>
+
+<div class="stick">
+  <div class="q">Q1. Are \(Q, K, V\) three different inputs?</div>
+  <div class="lbl">Why it trips readers</div><div>Eq. (1) and Figure 2 draw them as three separate input arrows, so they look like three different data sources.</div>
+  <div class="lbl">Resolution</div><div>In self-attention all three come from <b>the same input \(x\)</b> — only the projection matrices differ (\(xW^Q, xW^K, xW^V\); see the MultiHead card). The one place they genuinely come from different sources is encoder–decoder attention: \(Q\) from the decoder, \(K,V\) from the encoder output (the middle connection in Figure 1).</div>
+</div>
+
+<div class="stick">
+  <div class="q">Q2. "Outputs (shifted right)" — doesn't the decoder peek at the answer?</div>
+  <div class="lbl">Why it trips readers</div><div>Figure 1's bottom right feeds the target sequence into the decoder, which looks like the ground truth is needed at inference too.</div>
+  <div class="lbl">Resolution</div><div><b>During training</b> the target is fed shifted one step (teacher forcing), and masked self-attention (§3.2.3) sets future positions to \(-\infty\), so position \(i\)'s prediction sees only targets before \(i\). <b>At inference</b> the model feeds back its own generated tokens instead. The figure shows the training-time wiring.</div>
+</div>
+
+<div class="stick">
+  <div class="q">Q3. Don't 8 heads cost 8× the compute?</div>
+  <div class="lbl">Why it trips readers</div><div>"Attention performed 8 times in parallel" (§3.2.2) reads like an 8× bill.</div>
+  <div class="lbl">Resolution</div><div>Each head is <b>shrunk</b> to \(d_k=d_v=d_{\text{model}}/h=64\). Since \(8\times64=512\), the total compute is close to one full-width attention (see the MultiHead card's intuition). What multiplies by 8 is the number of perspectives, not the cost.</div>
+</div>
+
+<div class="stick">
+  <div class="q">Q4. Why is the positional encoding added (⊕) to the embedding rather than concatenated?</div>
+  <div class="lbl">Why it trips readers</div><div>Addition feels like it should "smear" word and position information into each other. §3.5 says they are summed but never says why.</div>
+  <div class="lbl">Resolution</div><div>What the paper states is twofold: PE has the same width \(d_{\text{model}}\), so addition is possible (§3.5), and learned embeddings performed the same anyway (Table 3 (E)). Versus concatenation, addition adds no dimensions or parameters. The popular explanation that "in high dimensions the two signals survive in near-orthogonal subspaces" is an interpretation from outside the paper — treat it as <span class="badge-u">⚠ reference only</span>.</div>
+</div>
+
+<!-- ═══════════════ Phase 3 ═══════════════ -->
+<div class="phase" id="phase3"><div class="ph-num">Phase 3 · The Verdict</div><h2>Final analysis — Steps 6 · 7</h2></div>
+
+<div class="step-tag">STEP 6</div>
+<h3>Reconciling conclusions — independent reading vs the authors</h3>
+<div class="howto"><span class="howto-label">What to do at this step</span><br>
+Put the Step-5 independent reading next to the authors' discussion and conclusions. Point out overstated claims and quietly widened scope with <b>specific sentences and numbers</b> — and acknowledge agreement where it exists.</div>
+<p><b>Where they agree (fair assessment).</b> Research claims (a) and (b) are well supported. Table 2 shows "higher BLEU at lower FLOPs" and Table 1 shows "\(O(1)\) sequential ops and path length", so the core claim — SOTA translation and fast training from attention alone, no recurrence — is not an overstatement. The ablations (Table 3) also control each component's contribution honestly.</p>
+<p><b>Points to press.</b></p>
+<ul>
+  <li><b>The title oversells.</b> "Attention Is All You Need" — yet the model does not work without the position-wise FFN (Eq. 2), residuals, LayerNorm, and positional encoding. Table 3 (D)'s drop at dropout 0.0 (24.6) shows non-attention pieces are also essential. Read the title as rhetoric, not as a literal claim.</li>
+  <li><b>An internal inconsistency.</b> §6.1 of the paper reports the EN-FR big model as "a BLEU score of 41.0", while Table 2 lists <b>41.8</b>. Which number is final is ambiguous from the text alone (the abstract and table use 41.8).</li>
+  <li><b>No statistical significance.</b> Table 3's 0.1–0.4 BLEU gaps carry conclusions like "bigger is better" and "\(d_k\) matters", but with no repeats or variance reported, some of these gaps may be noise.</li>
+</ul>
+
+<div class="step-tag">STEP 7</div>
+<h3>Considering alternative explanations</h3>
+<div class="howto"><span class="howto-label">What to do at this step</span><br>
+Check confounders that could explain the results, limitations the authors do and do not acknowledge, and conflicts of interest / funding.</div>
+<table class="plain">
+  <tr><th style="width:22%">Category</th><th>Assessment</th></tr>
+  <tr><td>Confounders</td><td>How much of the gain is the self-attention architecture versus the <b>training recipe</b> — large batches (≈25k tokens), label smoothing (\(\epsilon_{ls}{=}0.1\))<sup class="kref"><a href="#refs">[K10]</a></sup>, checkpoint averaging, the warm-up schedule — is not fully separable. Table 3 controls architectural knobs, but the recipe stays mostly fixed.</td></tr>
+  <tr><td>Metric dependence</td><td>Every conclusion rides on BLEU alone; whether human evaluation or other metrics would preserve the ranking is unverified.</td></tr>
+  <tr><td>Limitations acknowledged</td><td>\(O(n^2)\) attention cost on long sequences → the authors themselves preview "restricted (local) attention"; extending beyond text (images, audio, video) and making generation less sequential are left as future work.</td></tr>
+  <tr><td>Limitations not acknowledged</td><td>No seed variance or significance reporting; validation limited to high-resource language pairs; no quantification of what \(O(n^2)\) memory means for real deployments.</td></tr>
+  <tr><td>Conflicts / funding</td><td>Seven of eight authors are at Google (Brain/Research) and the released code is Google's <code>tensor2tensor</code>. No separate funding or COI statement. Benchmarks and cost estimates are on in-house infrastructure — worth keeping in mind while reading.</td></tr>
+</table>
+
+<!-- ═══════════════ Final insight ═══════════════ -->
+<h2 id="insight">Final insight &amp; self-check</h2>
+<p><b>The core contribution, reconstructed in four sentences.</b> The Transformer is the first sequence-transduction model to remove recurrence and convolution entirely, building its encoder–decoder from self-attention that links any two positions in a constant number of operations. It parallelizes scaled dot-product attention across multiple heads, injects order through sinusoidal positional encodings, reprocesses each position with a feed-forward network, and stabilizes everything with residuals and LayerNorm. The result trained massively in parallel and set a new SOTA on WMT 2014 EN-DE (28.4) and EN-FR (41.8) at a fraction of prior cost, generalizing to parsing as well. This simple, parallel architecture went on to become the backbone of virtually every large language and vision model.</p>
+<h4>Seven-question self-check — can you answer each in your own words?</h4>
+<ul class="check">
+  <li>(S1) Can you explain the encoder–decoder data flow from the one architecture figure?</li>
+  <li>(S2) Can you state the paper's hypothesis — (a) quality, (b) speed — in one sentence?</li>
+  <li>(S3) Can you distinguish the RNN/CNN lineages' limits from the gap the Transformer fills?</li>
+  <li>(S4) Can you give the role of each term in Eq. (1) — \(QK^{\top}/\sqrt{d_k}\), softmax, \(V\) — and the reason for \(\sqrt{d_k}\)?</li>
+  <li>(S5) Can you draw conclusions from Tables 2–3 without the authors' narration?</li>
+  <li>(S6) Can you spot the title's overreach and the 41.0 / 41.8 inconsistency yourself?</li>
+  <li>(S7) Can you name the alternative explanations (training recipe, metric dependence) and the conflicts of interest?</li>
+</ul>
+
+<!-- ═══════════════ Appendix: run it yourself ═══════════════ -->
+<h2 id="runbox">Appendix — Run it yourself</h2>
+<p>Reproduction code for the numeric examples in this report (requires numpy). Copy, run, and you should see the same output. <span class="run-verified">✓ All four snippets passed machine verification when this report was generated.</span></p>
+
+<div class="run-card">
+  <div class="run-title">① The [0.73, 0.27] from Eq. (1)'s intuition — Scaled Dot-Product Attention card</div>
+<pre class="runnable"><code>import numpy as np
+scores = np.array([8.0, 0.0])              # query·key dot-product scores
+scaled = scores / np.sqrt(64)              # d_k = 64 → divide by 8
+w = np.exp(scaled) / np.exp(scaled).sum()  # softmax
+print(np.round(w, 2))</code></pre>
+<pre class="run-output">[0.73 0.27]</pre>
+</div>
+
+<div class="run-card">
+  <div class="run-title">② Ladder rung 3's softmax — [2,1,0] → weights</div>
+<pre class="runnable"><code>import numpy as np
+z = np.array([2.0, 1.0, 0.0])
+w = np.exp(z) / np.exp(z).sum()
+print(np.round(w, 3), round(w.sum(), 3))   # weights and their sum (=1)</code></pre>
+<pre class="run-output">[0.665 0.245 0.09 ] 1.0</pre>
+</div>
+
+<div class="run-card">
+  <div class="run-title">③ Ladder rung 10 / Eq. (1)'s \(\sqrt{d_k}\) argument — is the dot product's std really 8?</div>
+<pre class="runnable"><code>import numpy as np
+rng = np.random.default_rng(0)             # fixed seed → reproducible
+q, k = rng.standard_normal((2, 100000, 64))
+dots = (q * k).sum(axis=1)                 # 100k dot products at d_k = 64
+print(round(dots.std(), 1), round((dots / np.sqrt(64)).std(), 2))</code></pre>
+<pre class="run-output">8.0 1.0</pre>
+</div>
+
+<div class="run-card">
+  <div class="run-title">④ Ladder rung 8's LayerNorm — [2,4,6] → normalized</div>
+<pre class="runnable"><code>import numpy as np
+x = np.array([2.0, 4.0, 6.0])
+ln = (x - x.mean()) / x.std()
+print(np.round(ln, 2))</code></pre>
+<pre class="run-output">[-1.22  0.    1.22]</pre>
+</div>
+
+<!-- ═══════════════ Glossary ═══════════════ -->
+<h2 id="glossary">Glossary</h2>
+<table class="plain">
+  <tr><th style="width:30%">Term</th><th>Meaning</th></tr>
+  <tr><td>BLEU</td><td>Automatic machine-translation metric based on n-gram overlap with reference translations (higher is better).</td></tr>
+  <tr><td>BPE / word-piece</td><td>Subword tokenizers that split words into frequent pieces to handle rare and unseen words.</td></tr>
+  <tr><td>encoder–decoder attention</td><td>Attention where the decoder provides queries and the encoder output provides keys/values; generation consults the input.</td></tr>
+  <tr><td>FFN (position-wise)</td><td>A two-layer fully connected network applied identically at each position (Eq. 2); no cross-position interaction.</td></tr>
+  <tr><td>LayerNorm</td><td>Normalizes a sample's features to zero mean and unit variance, stabilizing training (the "Norm" in Add &amp; Norm).</td></tr>
+  <tr><td>masked self-attention</td><td>Decoder self-attention with future positions set to \(-\infty\), preserving autoregressive generation.</td></tr>
+  <tr><td>multi-head attention</td><td>Running attention \(h\) times through different projections and merging the results (the MultiHead formula).</td></tr>
+  <tr><td>positional encoding</td><td>Sinusoidal vectors injecting order information into a recurrence-free model (§3.5).</td></tr>
+  <tr><td>residual connection</td><td>Adding the input to the output, \(x+\mathrm{Sublayer}(x)\), to ease training of deep networks.</td></tr>
+  <tr><td>scaled dot-product attention</td><td>\(\mathrm{softmax}(QK^{\top}/\sqrt{d_k})V\) — the Transformer's basic attention unit (Eq. 1).</td></tr>
+  <tr><td>self-attention</td><td>Attention relating different positions of one sequence to build that sequence's representation.</td></tr>
+  <tr><td>sequence transduction</td><td>Transforming one sequence into another (translation, summarization, ...).</td></tr>
+  <tr><td>warmup</td><td>Linearly raising the learning rate early in training before decaying it (Eq. 3).</td></tr>
+</table>
+
+<!-- ═══════════════ References ═══════════════ -->
+<h2 id="refs" class="pbreak">References</h2>
+<p><b>The paper.</b> A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, Ł. Kaiser, I. Polosukhin. "Attention Is All You Need." NIPS 2017. arXiv:1706.03762. <a href="https://arxiv.org/abs/1706.03762">https://arxiv.org/abs/1706.03762</a></p>
+<p>The [K#] entries below are external sources used for background and related work. All were verified directly against their arXiv abstract or official page (checked 2026-07-06; [K3]'s publisher abstract returned 403, so only its bibliography was confirmed). <span class="badge-v">✓ Verified</span></p>
+<table class="plain">
+  <tr><th style="width:8%">ID</th><th>Source (title · authors · year · URL)</th><th style="width:12%">Status</th></tr>
+  <tr><td>[K1]</td><td>Neural Machine Translation by Jointly Learning to Align and Translate — Bahdanau, Cho, Bengio, 2014. arXiv:1409.0473. <a href="https://arxiv.org/abs/1409.0473">link</a></td><td><span class="badge-v">✓</span></td></tr>
+  <tr><td>[K2]</td><td>Sequence to Sequence Learning with Neural Networks — Sutskever, Vinyals, Le, 2014 (NIPS). arXiv:1409.3215. <a href="https://arxiv.org/abs/1409.3215">link</a></td><td><span class="badge-v">✓</span></td></tr>
+  <tr><td>[K3]</td><td>Long Short-Term Memory — Hochreiter, Schmidhuber, 1997. Neural Computation 9(8):1735—1780. <a href="https://ieeexplore.ieee.org/document/6795963">link</a></td><td><span class="badge-v">✓</span> <span style="font-size:.8rem; color:var(--sub)">biblio only</span></td></tr>
+  <tr><td>[K4]</td><td>Convolutional Sequence to Sequence Learning — Gehring, Auli, Grangier, Yarats, Dauphin, 2017. arXiv:1705.03122. <a href="https://arxiv.org/abs/1705.03122">link</a></td><td><span class="badge-v">✓</span></td></tr>
+  <tr><td>[K5]</td><td>Layer Normalization — Ba, Kiros, Hinton, 2016. arXiv:1607.06450. <a href="https://arxiv.org/abs/1607.06450">link</a></td><td><span class="badge-v">✓</span></td></tr>
+  <tr><td>[K6]</td><td>Neural Machine Translation in Linear Time (ByteNet) — Kalchbrenner et al., 2016. arXiv:1610.10099. <a href="https://arxiv.org/abs/1610.10099">link</a></td><td><span class="badge-v">✓</span></td></tr>
+  <tr><td>[K7]</td><td>Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer — Shazeer et al., 2017. arXiv:1701.06538. <a href="https://arxiv.org/abs/1701.06538">link</a></td><td><span class="badge-v">✓</span></td></tr>
+  <tr><td>[K8]</td><td>Adam: A Method for Stochastic Optimization — Kingma, Ba, 2014 (ICLR 2015). arXiv:1412.6980. <a href="https://arxiv.org/abs/1412.6980">link</a></td><td><span class="badge-v">✓</span></td></tr>
+  <tr><td>[K9]</td><td>Google's Neural Machine Translation System (GNMT) — Wu, Schuster, Chen et al., 2016. arXiv:1609.08144. <a href="https://arxiv.org/abs/1609.08144">link</a></td><td><span class="badge-v">✓</span></td></tr>
+  <tr><td>[K10]</td><td>Rethinking the Inception Architecture for Computer Vision (label smoothing) — Szegedy et al., 2015 (CVPR 2016). arXiv:1512.00567. <a href="https://arxiv.org/abs/1512.00567">link</a></td><td><span class="badge-v">✓</span></td></tr>
+  <tr><td>[K11]</td><td>Deep Residual Learning for Image Recognition — He, Zhang, Ren, Sun, 2015 (CVPR 2016). arXiv:1512.03385. <a href="https://arxiv.org/abs/1512.03385">link</a></td><td><span class="badge-v">✓</span></td></tr>
+</table>
+
+</body>
+</html>

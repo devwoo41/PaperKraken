@@ -1,0 +1,15 @@
+# QA rasterizations produced during report verification
+qa-*.png
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+
+# Node / Python caches
+node_modules/
+__pycache__/
+*.pyc
+
+# Local scratch
+*.tmp

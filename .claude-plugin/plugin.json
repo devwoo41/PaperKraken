@@ -1,0 +1,14 @@
+{
+  "name": "paperkraken",
+  "description": "Turn any research-paper PDF into a tutorial-grade critical-reading report (typeset PDF, Korean or English) using Nature's 7-step methodology — prerequisite ladder, every equation analyzed term by term, original figure crops decoded, web-verified background, machine-verified numeric examples, and a full critical audit.",
+  "version": "1.0.0",
+  "author": {
+    "name": "devwoo41",
+    "email": "devwooju@gmail.com"
+  },
+  "homepage": "https://github.com/devwoo41/PaperKraken",
+  "repository": "https://github.com/devwoo41/PaperKraken",
+  "license": "MIT",
+  "keywords": ["research", "papers", "arxiv", "pdf", "critical-reading", "equations", "report", "korean"],
+  "category": "research"
+}
